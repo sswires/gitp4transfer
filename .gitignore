@@ -19,6 +19,13 @@ git-filter-repo.py
 
 _testrun_transfer/
 log-*.log
-.vscode/
 __pycache__/
 *.pyc
+
+# IDE ignore filters
+.vscode/
+.vs/
+.idea/
+
+# Ignore default configuration file
+transfer.yaml
