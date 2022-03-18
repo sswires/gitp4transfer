@@ -339,6 +339,12 @@ target:
 branch_maps:
   - git_branch:  "master"
     targ:   "//git_import/master"
+    
+# user_map: A dictionary of Git users to map to Perforce usernames
+#   This will be modified using p4 change -f and requires superuser
+user_map:
+  A User: "auser"
+  First McLastname: "fmclastname"
 
 # import_anon_branches: Set this to 'y' to import anonymous branches - NOT YET FUNCTIONAL!!!
 #   Any other value means they will not be imported.
@@ -1116,18 +1122,23 @@ class P4Target(P4Base):
                     sourceDescription=commit.description,
                     sourceChange=commit.commitID, sourcePort='git_repo',
                     sourceUser=commit.name, sourceEmail=commit.email)
-                self.updateChange(newChangeId=newChangeId, description=description, date=commit.date)
+                self.updateChange(newChangeId=newChangeId, description=description, user=commit.name, date=commit.date)
             else:
                 self.logger.error("failed to replicate change {}".format(commit))
             return newChangeId
 
-    def updateChange(self, newChangeId, description, date):
+    def updateChange(self, newChangeId, description, user, date):
         # need to update the user and time stamp - but only if a superuser
         if not self.options.superuser == "y":
             return
         newChange = self.p4.fetch_change(newChangeId)
         newChange._description = description
         newChange._date = to_perforce_time(date)
+
+        # change the username of the commit if we have a mapping between the name of the committer's name and p4
+        if user in self.options.user_map:
+            newChange._user = self.options.user_map[user]
+
         self.p4.save_change(newChange, '-f')
 
     def getCounter(self):
@@ -1240,6 +1251,7 @@ class GitP4Transfer(object):
         self.options.branch_maps = self.getOption(GENERAL_SECTION, "branch_maps")
         if not self.options.branch_maps:
             errors.append("Option branch_maps must not be empty")
+        self.options.user_map = self.getOption(GENERAL_SECTION, "user_map")
         self.options.anon_branches_root = self.getOption(GENERAL_SECTION, "anon_branches_root")
         self.options.import_anon_branches = self.getOption(GENERAL_SECTION, "import_anon_branches", "n")
         self.options.ignore_files = self.getOption(GENERAL_SECTION, "ignore_files")
