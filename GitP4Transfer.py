@@ -84,6 +84,7 @@ import collections
 # Non-standard modules
 import P4
 import logutils
+import pytz
 
 # Import yaml which will roundtrip comments
 from ruamel.yaml import YAML
@@ -435,11 +436,12 @@ class GitFileChanges():
 class GitCommit():
     "Convenience class for a git commit"
 
-    def __init__(self, commitID, name, email, description) -> None:
+    def __init__(self, commitID, name, email, description, date) -> None:
         self.commitID = commitID
         self.name = name
         self.email = email
         self.description = description
+        self.date = date
         self.parents = []
         self.fileChanges = []
         self.branch = None
@@ -529,7 +531,7 @@ class GitInfo:
                     filenames = [PathQuoting.dequote(x) for x in splits[1:]]
                     fileChanges.append(GitFileChanges(modes, shas, change_types, filenames))
 
-            commits[commitID] = GitCommit(commitID, name, email, '\n'.join(desc))
+            commits[commitID] = GitCommit(commitID, name, email, '\n'.join(desc), date)
             commits[commitID].parents = parents
             commits[commitID].fileChanges = fileChanges
             commitList.append(commitID)
@@ -1085,7 +1087,7 @@ class P4Target(P4Base):
             description = self.formatChangeDescription(
                 sourceDescription=commit.description,
                 sourceChange=commit.commitID, sourcePort='git_repo',
-                sourceUser=commit.name)
+                sourceUser=commit.name, sourceEmail=commit.email)
             newChangeId = 0
             result = None
             try:
@@ -1113,18 +1115,19 @@ class P4Target(P4Base):
                 description = self.formatChangeDescription(
                     sourceDescription=commit.description,
                     sourceChange=commit.commitID, sourcePort='git_repo',
-                    sourceUser=commit.name)
-                self.updateChange(newChangeId=newChangeId, description=description)
+                    sourceUser=commit.name, sourceEmail=commit.email)
+                self.updateChange(newChangeId=newChangeId, description=description, date=commit.date)
             else:
                 self.logger.error("failed to replicate change {}".format(commit))
             return newChangeId
 
-    def updateChange(self, newChangeId, description):
+    def updateChange(self, newChangeId, description, date):
         # need to update the user and time stamp - but only if a superuser
         if not self.options.superuser == "y":
             return
         newChange = self.p4.fetch_change(newChangeId)
         newChange._description = description
+        newChange._date = to_perforce_time(date)
         self.p4.save_change(newChange, '-f')
 
     def getCounter(self):
@@ -1147,6 +1150,10 @@ def valid_datetime_type(arg_datetime_str):
         msg = "Given Datetime ({0}) not valid! Expected format, 'YYYY/MM/DD HH:mm'!".format(arg_datetime_str)
         raise argparse.ArgumentTypeError(msg)
 
+def to_perforce_time(git_time_str):
+    git_time = datetime.strptime(git_time_str, "%Y-%m-%d %H:%M:%S %z")
+    git_time_utc = git_time.astimezone(pytz.UTC)
+    return git_time_utc.strftime('%Y/%m/%d %H:%M:%S')
 
 class GitP4Transfer(object):
     "Main transfer class"
