@@ -996,12 +996,17 @@ class P4Target(P4Base):
         if not fileChanges or (0 < len([f for f in fileChanges if f.changeTypes == 'MM'])):
             # Do a git diff-tree to make sure we detect files changed on the target branch rather than just dirs
             fileChanges = self.source.gitinfo.getFileChanges(commit)
+
+        # Determine relative path if the destination is in a subdirectory
+        relative_path = ''
+        if self.source.ws_root:
+            relative_path = os.path.relpath(self.source.git_repo, self.source.ws_root)
         
         if not commit.parents:
             for fc in fileChanges:
                 self.logger.debug("fileChange: %s %s" % (fc.changeTypes, fc.filenames[0]))
                 if fc.filenames[0]:
-                    filename = PathQuoting.dequote(fc.filenames[0])
+                    filename = os.path.join(relative_path, PathQuoting.dequote(fc.filenames[0]))
                     if fc.changeTypes == 'A':
                         self.p4cmd('rec', '-af', filename)
                     elif fc.changeTypes == 'M':
