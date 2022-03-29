@@ -749,7 +749,8 @@ class P4Base(object):
         v = self.options.branch_maps[0] # Start with first one - assume to be equivalent of master
         line = "%s/... //%s/..." % (v['targ'], self.p4.client)
         clientView.append(line)
-        for exclude in ['.git/...']:
+
+        for exclude in [self.source.getRelativeGitPath() + '.git/...']:
             line = "-%s/%s //%s/%s" % (v['targ'], exclude, self.p4.client, exclude)
             clientView.append(line)
 
@@ -759,7 +760,7 @@ class P4Base(object):
         self.p4.save_client(clientspec)
         logOnce(self.logger, "updated %s:%s:%s" % (self.p4id, self.p4.client, pprint.pformat(clientspec)))
 
-        self.p4.cwd = self.root
+        self.p4.cwd = self.source.git_repo
         ctr = P4.Map('//"'+clientspec._client+'/..."   "' + clientspec._root + '/..."')
         self.localmap = P4.Map.join(self.clientmap, ctr)
         self.depotmap = self.localmap.reverse()
@@ -779,7 +780,7 @@ class P4Base(object):
                     break
         line = "%s/... //%s/..." % (targ, self.p4.client)
         clientView.append(line)
-        for exclude in ['.git/...']:
+        for exclude in [self.source.getRelativeGitPath() + '.git/...']:
             line = "-%s/%s //%s/%s" % (targ, exclude, self.p4.client, exclude)
             clientView.append(line)
 
@@ -890,6 +891,14 @@ class GitSource(P4Base):
         args = ['git', 'switch', '-C', tempBranch, commitID]
         self.run_cmd(' '.join(args), get_output=False)
 
+    def getRelativeGitPath(self):
+        # Determine relative path if the destination is in a subdirectory
+        relative_path = ''
+        if self.source.ws_root:
+            relative_path = os.path.relpath(self.source.git_repo, self.source.ws_root)
+
+        return relative_path
+
 class P4Target(P4Base):
     "Functionality for transferring changes to target Perforce repository"
 
@@ -997,16 +1006,11 @@ class P4Target(P4Base):
             # Do a git diff-tree to make sure we detect files changed on the target branch rather than just dirs
             fileChanges = self.source.gitinfo.getFileChanges(commit)
 
-        # Determine relative path if the destination is in a subdirectory
-        relative_path = ''
-        if self.source.ws_root:
-            relative_path = os.path.relpath(self.source.git_repo, self.source.ws_root)
-        
         if not commit.parents:
             for fc in fileChanges:
                 self.logger.debug("fileChange: %s %s" % (fc.changeTypes, fc.filenames[0]))
                 if fc.filenames[0]:
-                    filename = os.path.join(relative_path, PathQuoting.dequote(fc.filenames[0]))
+                    filename = PathQuoting.dequote(fc.filenames[0])
                     if fc.changeTypes == 'A':
                         self.p4cmd('rec', '-af', filename)
                     elif fc.changeTypes == 'M':
