@@ -894,8 +894,8 @@ class GitSource(P4Base):
     def getRelativeGitPath(self):
         # Determine relative path if the destination is in a subdirectory
         relative_path = ''
-        if self.source.ws_root:
-            relative_path = os.path.relpath(self.source.git_repo, self.source.ws_root)
+        if self.ws_root:
+            relative_path = os.path.relpath(self.git_repo, self.ws_root)
 
         return relative_path
 
