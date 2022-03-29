@@ -74,7 +74,7 @@ import pprint
 from string import Template
 import argparse
 import textwrap
-import os.path
+import os
 from datetime import datetime
 import logging
 import time
@@ -750,7 +750,7 @@ class P4Base(object):
         line = "%s/... //%s/..." % (v['targ'], self.p4.client)
         clientView.append(line)
 
-        for exclude in [self.source.getRelativeGitPath() + '.git/...']:
+        for exclude in [self.source.getRelativeGitPath(trailing_slash=True) + '.git/...']:
             line = "-%s/%s //%s/%s" % (v['targ'], exclude, self.p4.client, exclude)
             clientView.append(line)
 
@@ -780,7 +780,7 @@ class P4Base(object):
                     break
         line = "%s/... //%s/..." % (targ, self.p4.client)
         clientView.append(line)
-        for exclude in [self.source.getRelativeGitPath() + '.git/...']:
+        for exclude in [self.source.getRelativeGitPath(trailing_slash=True) + '.git/...']:
             line = "-%s/%s //%s/%s" % (targ, exclude, self.p4.client, exclude)
             clientView.append(line)
 
@@ -891,11 +891,14 @@ class GitSource(P4Base):
         args = ['git', 'switch', '-C', tempBranch, commitID]
         self.run_cmd(' '.join(args), get_output=False)
 
-    def getRelativeGitPath(self):
+    def getRelativeGitPath(self, trailing_slash=False):
         # Determine relative path if the destination is in a subdirectory
         relative_path = ''
         if self.ws_root:
             relative_path = os.path.relpath(self.git_repo, self.ws_root)
+
+            if trailing_slash:
+                relative_path += os.sep
 
         return relative_path
 
