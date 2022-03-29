@@ -318,6 +318,10 @@ source:
     #    This will be used to update the client workspace Root: field for target workspace
     git_repo:
 
+    # ws_root: specific directory to use for workspace root, for example if you want to map the git repo to a subdirectory
+    #   This will replace the git_repo value as the root. This should be a parent path of git_repo
+    # ws_root:
+    
 target:
     # P4PORT to connect to, e.g. some-server:1666 - if this is on localhost and you just
     # want to specify port number, then use quotes: "1666"
@@ -736,7 +740,7 @@ class P4Base(object):
         clientspec = self.p4.fetch_client(self.p4.client)
         logOnce(self.logger, "orig %s:%s:%s" % (self.p4id, self.p4.client, pprint.pformat(clientspec)))
 
-        self.root = self.source.git_repo
+        self.root = self.source.ws_root or self.source.git_repo
         clientspec._root = self.root
         clientspec["Options"] = clientspec["Options"].replace("normdir", "rmdir")
         clientspec["Options"] = clientspec["Options"].replace("noallwrite", "allwrite")
@@ -1269,6 +1273,7 @@ class GitP4Transfer(object):
         self.target = P4Target(TARGET_SECTION, self.options, self.source)
 
         self.readOption('git_repo', self.source)
+        self.readOption('ws_root', self.source, optional=True)
         self.readP4Section(self.target)
 
     def readP4Section(self, p4config):
